@@ -213,7 +213,86 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+// ============================================================================
+// GENERATE EBAY LISTING ENDPOINT
+// ============================================================================
+app.post('/api/generate-listing', async (req, res) => {
+  try {
+    const { itemName, imageData, mimeType, recommendedPrice, marketData } = req.body;
 
+    if (!itemName) {
+      return res.status(400).json({ error: 'Item name is required' });
+    }
+
+    console.log(`Generating eBay listing for: "${itemName}"`);
+
+    // Build prompt for listing generation
+    let prompt = `Create a professional eBay listing for: ${itemName}
+
+Generate the following in a structured format:
+
+TITLE: (Create an SEO-optimized eBay title, max 80 characters, include key search terms)
+
+CONDITION: (Suggest: New, Like New, Very Good, Good, or Acceptable based on typical condition)
+
+DESCRIPTION: (Write 3-4 paragraphs:
+- Paragraph 1: Engaging opening about the item
+- Paragraph 2: Key features and specifications
+- Paragraph 3: Condition details and what's included
+- Paragraph 4: Shipping and return information)
+
+ITEM SPECIFICS: (List 5-8 key details like Brand, Model, Size, Color, etc.)
+
+PRICING NOTES: (Brief note about the ${recommendedPrice ? `$${recommendedPrice}` : 'suggested'} price point based on market analysis)`;
+
+    // If we have image data, include it
+    const messages = [{
+      role: 'user',
+      content: imageData ? [
+        {
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: mimeType,
+            data: imageData
+          }
+        },
+        {
+          type: 'text',
+          text: prompt
+        }
+      ] : [{ type: 'text', text: prompt }]
+    }];
+
+    const response = await axios.post(
+      'https://api.anthropic.com/v1/messages',
+      {
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: messages
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': EBAY_CONFIG.CLAUDE_API_KEY,
+          'anthropic-version': '2023-06-01'
+        }
+      }
+    );
+
+    const listing = response.data.content[0].text;
+    console.log('Listing generated successfully');
+
+    res.json({ listing });
+
+  } catch (error) {
+    console.error('Error generating listing:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to generate listing',
+      details: error.message 
+    });
+  }
+});
 // ============================================================================
 // START THE SERVER
 // ============================================================================
