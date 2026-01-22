@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eBay Price Finder + Listing Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen p-6">
+    <div class="max-w-6xl mx-auto">
+        <!-- Status Banner -->
+        <div class="bg-green-50 border-2 border-green-400 rounded-2xl p-4 mb-6">
+            <div class="flex items-center gap-3">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                    <p class="font-bold text-green-900">🎯 AI-Powered Pricing + Listing Generator!</p>
+                    <p class="text-sm text-green-700">Analyze prices AND create professional eBay listings!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Tool -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3">
+                <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                </svg>
+                eBay Price Finder + Listing Generator
+            </h1>
+            <p class="text-gray-600 mb-6">Upload a photo to analyze prices and generate a professional listing</p>
+
+            <div class="space-y-4">
+                <!-- Photo Upload -->
+                <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-indigo-400 transition cursor-pointer" id="upload-area">
+                    <input type="file" accept="image/*" id="image-input" class="hidden" capture="environment">
+                    <div id="upload-prompt" class="text-gray-400">
+                        <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                        </svg>
+                        <p class="text-lg font-semibold">📸 Click to Take or Upload Photo</p>
+                        <p class="text-sm mt-1">Works on all devices!</p>
+                    </div>
+                    <img id="image-preview" class="max-h-64 mx-auto rounded-lg shadow-md hidden">
+                </div>
+
+                <div class="flex items-center gap-4 my-4">
+                    <div class="flex-1 border-t border-gray-300"></div>
+                    <span class="text-gray-500 font-semibold">OR</span>
+                    <div class="flex-1 border-t border-gray-300"></div>
+                </div>
+
+                <!-- Text Search -->
+                <div class="flex gap-2">
+                    <input 
+                        type="text" 
+                        id="search-input" 
+                        placeholder="Type item name manually"
+                        class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none"
+                    >
+                    <button id="search-btn" class="bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
+                        Search
+                    </button>
+                </div>
+
+                <button id="analyze-btn" class="hidden w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
+                    🔍 Analyze Photo & Search eBay
+                </button>
+
+                <div id="loading" class="hidden text-center py-4">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                    <p class="text-gray-600 mt-2" id="loading-text">Working...</p>
+                </div>
+
+                <div id="item-description" class="bg-blue-50 border border-blue-200 rounded-lg p-4 hidden">
+                    <p class="text-sm text-gray-600 mb-1">Identified Item:</p>
+                    <p id="item-text" class="font-semibold text-gray-800 text-lg"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Container -->
+        <div id="results-container"></div>
+        
+        <!-- Listing Container -->
+        <div id="listing-container"></div>
+    </div>
+
+    <script>
+        const BACKEND_URL = 'https://ebay-backend-4uoj.onrender.com';
+        let currentImage = null;
+        let currentImageData = null;
+        let currentMimeType = null;
+        let currentItemName = '';
+        let currentListings = [];
+        let recommendedPrice = 0;
+
+        document.getElementById('upload-area').addEventListener('click', () => {
+            document.getElementById('image-input').click();
+        });
+
+        document.getElementById('image-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                currentImage = file;
+                currentMimeType = file.type;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    currentImageData = e.target.result.split(',')[1];
+                    document.getElementById('image-preview').src = e.target.result;
+                    document.getElementById('image-preview').classList.remove('hidden');
+                    document.getElementById('upload-prompt').classList.add('hidden');
+                    document.getElementById('analyze-btn').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('analyze-btn').addEventListener('click', analyzePhoto);
+        document.getElementById('search-btn').addEventListener('click', () => {
+            const query = document.getElementById('search-input').value.trim();
+            if (query) {
+                currentImageData = null;
+                searchEbay(query);
+            } else {
+                alert('Please enter an item name');
+            }
+        });
+
+        document.getElementById('search-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') document.getElementById('search-btn').click();
+        });
+
+        async function analyzePhoto() {
+            if (!currentImage) return;
+
+            document.getElementById('analyze-btn').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('loading-text').textContent = 'Analyzing photo...';
+            document.getElementById('results-container').innerHTML = '';
+            document.getElementById('listing-container').innerHTML = '';
+
+            try {
+                const analyzeResponse = await fetch(`${BACKEND_URL}/api/analyze-image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        imageData: currentImageData,
+                        mimeType: currentMimeType
+                    })
+                });
+
+                const analyzeData = await analyzeResponse.json();
+                if (analyzeData.error) throw new Error(analyzeData.details);
+
+                const itemName = analyzeData.description;
+                currentItemName = itemName;
+                document.getElementById('item-text').textContent = itemName;
+                document.getElementById('item-description').classList.remove('hidden');
+
+                document.getElementById('loading-text').textContent = 'Searching eBay...';
+                await searchEbay(itemName);
+
+            } catch (err) {
+                alert('Error: ' + err.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('analyze-btn').classList.remove('hidden');
+            }
+        }
+
+        async function searchEbay(query) {
+            currentItemName = query;
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('loading-text').textContent = 'Searching eBay...';
+            document.getElementById('item-text').textContent = query;
+            document.getElementById('item-description').classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/ebay/current`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.details);
+                
+                currentListings = data.items || [];
+                
+                if (currentListings.length > 0) {
+                    displayResults();
+                } else {
+                    alert('No results found.');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        function displayResults() {
+            const stats = calculateStats();
+            recommendedPrice = stats.recommended;
+            
+            let html = `
+                <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">📊 Market Analysis</h2>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg">
+                            <p class="text-xs text-gray-600 mb-1">Average</p>
+                            <p class="text-2xl font-bold text-blue-700">$${stats.average.toFixed(2)}</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg">
+                            <p class="text-xs text-gray-600 mb-1">Median</p>
+                            <p class="text-2xl font-bold text-purple-700">$${stats.median.toFixed(2)}</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
+                            <p class="text-xs text-gray-600 mb-1">Lowest</p>
+                            <p class="text-2xl font-bold text-green-700">$${stats.min.toFixed(2)}</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg">
+                            <p class="text-xs text-gray-600 mb-1">Highest</p>
+                            <p class="text-2xl font-bold text-orange-700">$${stats.max.toFixed(2)}</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-6 text-white mb-4">
+                        <h3 class="text-2xl font-bold mb-3">💰 Recommended Price</h3>
+                        <div class="text-5xl font-bold">$${stats.recommended.toFixed(2)}</div>
+                        <p class="mt-2 opacity-90">${stats.strategy}</p>
+                    </div>
+
+                    <button id="generate-listing-btn" class="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-lg hover:bg-green-700 transition">
+                        📝 Generate Professional eBay Listing
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-xl p-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">🔍 Current Listings (${stats.count})</h2>
+                    <div class="space-y-3 max-h-96 overflow-y-auto">
+                        ${currentListings.slice(0, 10).map(item => `
+                            <div class="border rounded-lg p-4">
+                                <div class="flex justify-between">
+                                    <h3 class="font-semibold flex-1">${item.title}</h3>
+                                    <p class="text-xl font-bold text-blue-600 ml-4">$${item.price.toFixed(2)}</p>
+                                </div>
+                                <p class="text-sm text-gray-600 mt-1">${item.condition}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('results-container').innerHTML = html;
+            document.getElementById('generate-listing-btn').addEventListener('click', generateListing);
+        }
+
+        async function generateListing() {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('loading-text').textContent = 'Generating professional listing...';
+            document.getElementById('listing-container').innerHTML = '';
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/generate-listing`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        itemName: currentItemName,
+                        imageData: currentImageData,
+                        mimeType: currentMimeType,
+                        recommendedPrice: recommendedPrice,
+                        marketData: { count: currentListings.length }
+                    })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.details);
+
+                displayListing(data.listing);
+
+            } catch (err) {
+                alert('Error generating listing: ' + err.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        function displayListing(listing) {
+            const html = `
+                <div class="bg-white rounded-2xl shadow-xl p-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold text-gray-800">📝 Your eBay Listing</h2>
+                        <button id="copy-listing-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+                            📋 Copy to Clipboard
+                        </button>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-6 whitespace-pre-wrap font-mono text-sm" id="listing-content">${listing}</div>
+                    <p class="text-sm text-gray-600 mt-4">✅ Review and edit this content, then paste into eBay when creating your listing!</p>
+                </div>
+            `;
+
+            document.getElementById('listing-container').innerHTML = html;
+            document.getElementById('copy-listing-btn').addEventListener('click', () => {
+                navigator.clipboard.writeText(listing);
+                alert('✅ Listing copied to clipboard!');
+            });
+
+            document.getElementById('listing-container').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function calculateStats() {
+            const prices = currentListings.map(item => item.price);
+            const average = prices.reduce((a, b) => a + b, 0) / prices.length;
+            const sorted = [...prices].sort((a, b) => a - b);
+            const median = sorted.length % 2 === 0
+                ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+                : sorted[Math.floor(sorted.length / 2)];
+            const min = Math.min(...prices);
+            const max = Math.max(...prices);
+            const priceVariability = (max - min) / average;
+            
+            let recommended, strategy;
+            
+            if (priceVariability > 0.5) {
+                recommended = median * 0.92;
+                strategy = "Conservative pricing for high variability";
+            } else if (priceVariability < 0.2) {
+                recommended = average * 0.98;
+                strategy = "Competitive pricing for tight market";
+            } else {
+                recommended = (median * 0.6 + average * 0.4);
+                strategy = "Balanced pricing strategy";
+            }
+
+            return { average, median, min, max, count: prices.length, recommended, strategy };
+        }
+    </script>
+</body>
+</html>
