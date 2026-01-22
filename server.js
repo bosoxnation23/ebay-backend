@@ -137,7 +137,7 @@ app.post('/api/ebay/sold', async (req, res) => {
 
   } catch (error) {
     console.error('Error in /api/ebay/sold:', error.message);
-    console.error('eBay Error Details:', error.response?.data);
+    console.error('eBay Error Details:', JSON.stringify(error.response?.data, null, 2));
     console.error('Status Code:', error.response?.status);
     res.status(500).json({ 
       error: 'Failed to search sold items',
