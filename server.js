@@ -16,7 +16,10 @@ const PORT = 3001;
 const EBAY_CONFIG = {
   APP_ID: process.env.EBAY_APP_ID,
   DEV_ID: process.env.EBAY_DEV_ID,
-  CERT_ID: process.env.EBAY_CERT_ID,  
+  CERT_ID: process.env.EBAY_CERT_ID,
+
+ // Claude API for image analysis
+  CLAUDE_API_KEY: process.env.CLAUDE_API_KEY,
   // PRODUCTION API Endpoints
   FINDING_API: 'https://svcs.ebay.com/services/search/FindingService/v1',
   BROWSE_API: 'https://api.ebay.com/buy/browse/v1',
@@ -78,7 +81,64 @@ async function getOAuthToken() {
     throw new Error('Failed to get eBay OAuth token');
   }
 }
+// ============================================================================
+// IMAGE ANALYSIS ENDPOINT
+// ============================================================================
+app.post('/api/analyze-image', async (req, res) => {
+  try {
+    const { imageData, mimeType } = req.body;
 
+    if (!imageData) {
+      return res.status(400).json({ error: 'Image data is required' });
+    }
+
+    console.log('Analyzing image with Claude...');
+
+    const response = await axios.post(
+      'https://api.anthropic.com/v1/messages',
+      {
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: mimeType,
+                data: imageData
+              }
+            },
+            {
+              type: 'text',
+              text: 'Analyze this image and provide a concise eBay search query (3-8 words) that would find similar items. Include: brand (if visible), item type, model/version, and key features. Return ONLY the search query, nothing else.'
+            }
+          ]
+        }]
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': EBAY_CONFIG.CLAUDE_API_KEY,
+          'anthropic-version': '2023-06-01'
+        }
+      }
+    );
+
+    const description = response.data.content[0].text.trim();
+    console.log(`Image identified as: "${description}"`);
+
+    res.json({ description });
+
+  } catch (error) {
+    console.error('Error analyzing image:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to analyze image',
+      details: error.message 
+    });
+  }
+});
 // ============================================================================
 // API ENDPOINT 1: SEARCH CURRENT LISTINGS (SOLD DATA REMOVED)
 // ============================================================================
