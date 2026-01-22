@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eBay Price Finder - Photo Upload</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen p-6">
+    <div class="max-w-6xl mx-auto">
+        <!-- Status Banner -->
+        <div class="bg-green-50 border-2 border-green-400 rounded-2xl p-4 mb-6">
+            <div class="flex items-center gap-3">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                </svg>
+                <div>
+                    <p class="font-bold text-green-900">📸 AI-Powered Photo Analysis!</p>
+                    <p class="text-sm text-green-700">Upload or take a photo - works on iPhone, iPad, and Mac!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Tool -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3">
+                <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                </svg>
+                eBay Price Finder
+            </h1>
+            <p class="text-gray-600 mb-6">Upload a photo or type an item name to get pricing recommendations</p>
+
+            <div class="space-y-4">
+                <!-- Photo Upload Area -->
+                <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-indigo-400 transition cursor-pointer" id="upload-area">
+                    <input type="file" accept="image/*" id="image-input" class="hidden" capture="environment">
+                    <div id="upload-prompt" class="text-gray-400">
+                        <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                        </svg>
+                        <p class="text-lg font-semibold">📸 Click to Take or Upload Photo</p>
+                        <p class="text-sm mt-1">Works on all devices!</p>
+                    </div>
+                    <img id="image-preview" class="max-h-64 mx-auto rounded-lg shadow-md hidden">
+                </div>
+
+                <!-- OR Divider -->
+                <div class="flex items-center gap-4 my-4">
+                    <div class="flex-1 border-t border-gray-300"></div>
+                    <span class="text-gray-500 font-semibold">OR</span>
+                    <div class="flex-1 border-t border-gray-300"></div>
+                </div>
+
+                <!-- Text Search -->
+                <div class="flex gap-2">
+                    <input 
+                        type="text" 
+                        id="search-input" 
+                        placeholder="Type item name manually (e.g., iPhone 14 Pro)"
+                        class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none"
+                    >
+                    <button id="search-btn" class="bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
+                        Search
+                    </button>
+                </div>
+
+                <!-- Action Button (for photo) -->
+                <button id="analyze-btn" class="hidden w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
+                    🔍 Analyze Photo & Search eBay
+                </button>
+
+                <!-- Loading State -->
+                <div id="loading" class="hidden text-center py-4">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                    <p class="text-gray-600 mt-2" id="loading-text">Analyzing photo...</p>
+                </div>
+
+                <!-- Item Description -->
+                <div id="item-description" class="bg-blue-50 border border-blue-200 rounded-lg p-4 hidden">
+                    <p class="text-sm text-gray-600 mb-1">Identified Item:</p>
+                    <p id="item-text" class="font-semibold text-gray-800 text-lg"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Container -->
+        <div id="results-container"></div>
+    </div>
+
+    <script>
+        const BACKEND_URL = 'https://ebay-backend-4uoj.onrender.com';
+        let currentImage = null;
+        let currentListings = [];
+
+        // Photo upload
+        document.getElementById('upload-area').addEventListener('click', () => {
+            document.getElementById('image-input').click();
+        });
+
+        document.getElementById('image-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                currentImage = file;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('image-preview').src = e.target.result;
+                    document.getElementById('image-preview').classList.remove('hidden');
+                    document.getElementById('upload-prompt').classList.add('hidden');
+                    document.getElementById('analyze-btn').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Analyze photo button
+        document.getElementById('analyze-btn').addEventListener('click', analyzePhoto);
+
+        // Text search
+        document.getElementById('search-btn').addEventListener('click', () => {
+            const query = document.getElementById('search-input').value.trim();
+            if (query) {
+                searchEbay(query);
+            } else {
+                alert('Please enter an item name');
+            }
+        });
+
+        document.getElementById('search-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('search-btn').click();
+            }
+        });
+
+        async function analyzePhoto() {
+            if (!currentImage) return;
+
+            document.getElementById('analyze-btn').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('loading-text').textContent = 'Analyzing photo with AI...';
+            document.getElementById('results-container').innerHTML = '';
+
+            try {
+                const base64Image = document.getElementById('image-preview').src.split(',')[1];
+
+                // Step 1: Analyze image
+                const analyzeResponse = await fetch(`${BACKEND_URL}/api/analyze-image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        imageData: base64Image,
+                        mimeType: currentImage.type
+                    })
+                });
+
+                const analyzeData = await analyzeResponse.json();
+                
+                if (analyzeData.error) {
+                    throw new Error(analyzeData.details || 'Failed to analyze image');
+                }
+
+                const itemName = analyzeData.description;
+                document.getElementById('item-text').textContent = itemName;
+                document.getElementById('item-description').classList.remove('hidden');
+
+                // Step 2: Search eBay
+                document.getElementById('loading-text').textContent = 'Searching eBay...';
+                await searchEbay(itemName);
+
+            } catch (err) {
+                alert('Error: ' + err.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('analyze-btn').classList.remove('hidden');
+            }
+        }
+
+        async function searchEbay(query) {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('loading-text').textContent = 'Searching eBay...';
+            document.getElementById('item-text').textContent = query;
+            document.getElementById('item-description').classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/ebay/current`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.details || 'Unknown error from eBay');
+                }
+                
+                currentListings = data.items || [];
+                
+                if (currentListings.length > 0) {
+                    displayResults();
+                } else {
+                    alert('No results found. Try a different search term.');
+                }
+            } catch (err) {
+                alert('Error searching: ' + err.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        function displayResults() {
+            const stats = calculateStats();
+            
+            let html = `
+                <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">📊 Market Analysis</h2>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg">
+                            <p class="text-xs text-gray-600 mb-1">Average Price</p>
+                            <p class="text-2xl font-bold text-blue-700">$${stats.average.toFixed(2)}</p>
+                            <p class="text-xs text-gray-500 mt-1">${stats.count} listings</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg">
+                            <p class="text-xs text-gray-600 mb-1">Median Price</p>
+                            <p class="text-2xl font-bold text-purple-700">$${stats.median.toFixed(2)}</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
+                            <p class="text-xs text-gray-600 mb-1">Lowest Price</p>
+                            <p class="text-2xl font-bold text-green-700">$${stats.min.toFixed(2)}</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg">
+                            <p class="text-xs text-gray-600 mb-1">Highest Price</p>
+                            <p class="text-2xl font-bold text-orange-700">$${stats.max.toFixed(2)}</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-6 text-white">
+                        <h3 class="text-2xl font-bold mb-3">💰 Recommended Selling Price</h3>
+                        <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+                            <div class="text-5xl font-bold mb-3">$${stats.recommended.toFixed(2)} USD</div>
+                            <div class="space-y-2 text-sm opacity-90">
+                                <p><strong>Strategy:</strong> ${stats.strategy}</p>
+                                <p><strong>Rationale:</strong> ${stats.rationale}</p>
+                                <div class="mt-3 pt-3 border-t border-white/20 grid grid-cols-2 gap-3">
+                                    <div>
+                                        <p class="text-xs opacity-75">Conservative</p>
+                                        <p class="text-lg font-bold">$${stats.conservative.toFixed(2)}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs opacity-75">Competitive</p>
+                                        <p class="text-lg font-bold">$${stats.competitive.toFixed(2)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-xl p-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">🔍 Current Active Listings</h2>
+                    <div class="space-y-3 max-h-96 overflow-y-auto">
+                        ${currentListings.map(item => `
+                            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h3 class="font-semibold text-gray-800 flex-1">${item.title}</h3>
+                                    <div class="text-right ml-4">
+                                        <p class="text-xl font-bold text-blue-600">$${item.price.toFixed(2)}</p>
+                                        <p class="text-xs text-gray-500">by ${item.seller}</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-4 text-sm text-gray-600">
+                                    <span class="bg-green-100 px-2 py-1 rounded">${item.condition}</span>
+                                    <span class="text-green-600 font-semibold">Active Now</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('results-container').innerHTML = html;
+        }
+
+        function calculateStats() {
+            const prices = currentListings.map(item => item.price);
+            const average = prices.reduce((a, b) => a + b, 0) / prices.length;
+            const sorted = [...prices].sort((a, b) => a - b);
+            const median = sorted.length % 2 === 0
+                ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+                : sorted[Math.floor(sorted.length / 2)];
+            const min = Math.min(...prices);
+            const max = Math.max(...prices);
+            const priceVariability = (max - min) / average;
+            
+            let recommended, strategy, rationale;
+            
+            if (priceVariability > 0.5) {
+                recommended = median * 0.92;
+                strategy = "Conservative median pricing";
+                rationale = "High price variation. Pricing below median increases sale likelihood.";
+            } else if (priceVariability < 0.2) {
+                recommended = average * 0.98;
+                strategy = "Competitive market pricing";
+                rationale = "Tight price clustering. Price just below average to stand out.";
+            } else {
+                recommended = (median * 0.6 + average * 0.4);
+                strategy = "Balanced market pricing";
+                rationale = "Moderate variation. Blend of median and average optimizes value.";
+            }
+
+            return {
+                average, median, min, max,
+                count: prices.length,
+                recommended,
+                conservative: median * 0.85,
+                competitive: average * 0.95,
+                strategy, rationale
+            };
+        }
+    </script>
+</body>
+</html>
