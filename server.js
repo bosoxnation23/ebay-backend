@@ -135,10 +135,13 @@ app.post('/api/ebay/sold', async (req, res) => {
       count: soldItems.length
     });
 
-  } catch (error) {
+  } } catch (error) {
     console.error('Error in /api/ebay/sold:', error.message);
-    console.error('eBay Error Details:', JSON.stringify(error.response?.data, null, 2));
+    console.error('Full eBay Response:', JSON.stringify(error.response?.data, null, 2));
     console.error('Status Code:', error.response?.status);
+    if (error.response?.data?.errorMessage) {
+      console.error('Error Array:', JSON.stringify(error.response.data.errorMessage[0].error, null, 2));
+    };
     res.status(500).json({ 
       error: 'Failed to search sold items',
       details: error.message,
