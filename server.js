@@ -80,76 +80,8 @@ async function getOAuthToken() {
 }
 
 // ============================================================================
-// API ENDPOINT 1: SEARCH SOLD ITEMS
+// API ENDPOINT 1: SEARCH CURRENT LISTINGS (SOLD DATA REMOVED)
 // ============================================================================
-app.post('/api/ebay/sold', async (req, res) => {
-  try {
-    const { query } = req.body;
-
-    if (!query) {
-      return res.status(400).json({ error: 'Search query is required' });
-    }
-
-    console.log(`Searching sold items for: "${query}"`);
-
-    const params = {
-      'OPERATION-NAME': 'findCompletedItems',
-      'SERVICE-VERSION': '1.0.0',
-      'SECURITY-APPNAME': EBAY_CONFIG.APP_ID,
-      'RESPONSE-DATA-FORMAT': 'JSON',
-      'REST-PAYLOAD': '',
-      'keywords': query,
-      'paginationInput.entriesPerPage': '100',
-      'paginationInput.pageNumber': '1',
-      'itemFilter(0).name': 'SoldItemsOnly',
-      'itemFilter(0).value': 'true',
-      'sortOrder': 'EndTimeSoonest'
-    };
-
-    const response = await axios.get(EBAY_CONFIG.FINDING_API, { params });
-
-    const searchResult = response.data.findCompletedItemsResponse?.[0]?.searchResult?.[0];
-    
-    if (!searchResult || searchResult['@count'] === '0') {
-      console.log('No sold items found');
-      return res.json({ items: [], count: 0 });
-    }
-
-    const items = searchResult.item || [];
-
-    const soldItems = items.map(item => ({
-      title: item.title?.[0] || 'No title',
-      price: parseFloat(item.sellingStatus?.[0]?.currentPrice?.[0]?.__value__ || 0),
-      soldDate: item.listingInfo?.[0]?.endTime?.[0] || null,
-      condition: item.condition?.[0]?.conditionDisplayName?.[0] || 'Not specified',
-      shipping: parseFloat(item.shippingInfo?.[0]?.shippingServiceCost?.[0]?.__value__ || 0),
-      itemUrl: item.viewItemURL?.[0] || '',
-      imageUrl: item.galleryURL?.[0] || '',
-      location: item.location?.[0] || ''
-    }));
-
-    console.log(`Found ${soldItems.length} sold items`);
-
-    res.json({
-      items: soldItems,
-      count: soldItems.length
-    });
-
-  } } catch (error) {
-    console.error('Error in /api/ebay/sold:', error.message);
-    console.error('Full eBay Response:', JSON.stringify(error.response?.data, null, 2));
-    console.error('Status Code:', error.response?.status);
-    if (error.response?.data?.errorMessage) {
-      console.error('Error Array:', JSON.stringify(error.response.data.errorMessage[0].error, null, 2));
-    };
-    res.status(500).json({ 
-      error: 'Failed to search sold items',
-      details: error.message,
-      ebayError: error.response?.data
-    });
-  }
-});
-
 // ============================================================================
 // API ENDPOINT 2: SEARCH CURRENT LISTINGS
 // ============================================================================
