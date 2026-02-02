@@ -216,36 +216,52 @@ app.get('/health', (req, res) => {
 // ============================================================================
 // GENERATE EBAY LISTING ENDPOINT
 // ============================================================================
+// ============================================================================
+// GENERATE EBAY LISTING ENDPOINT (POKEMON OPTIMIZED)
+// ============================================================================
 app.post('/api/generate-listing', async (req, res) => {
   try {
-    const { itemName, imageData, mimeType, recommendedPrice, marketData } = req.body;
+    const { itemName, imageData, mimeType, recommendedPrice, marketData, mode } = req.body;
 
     if (!itemName) {
       return res.status(400).json({ error: 'Item name is required' });
     }
 
-    console.log(`Generating eBay listing for: "${itemName}"`);
+    console.log(`Generating ${mode === 'pokemon' ? 'Pokemon' : 'standard'} listing for: "${itemName}"`);
 
-    // Build prompt for listing generation
-    let prompt = `Create a professional eBay listing for: ${itemName}
+    let prompt;
+    
+    if (mode === 'pokemon') {
+      // Pokemon-specific short format
+      prompt = `Analyze this Pokemon card and provide ONLY the following in a concise format:
 
-Generate the following in a structured format:
+TITLE: [Card Name - Set Name - Card Number - Condition] (max 80 chars, eBay optimized)
 
-TITLE: (Create an SEO-optimized eBay title, max 80 characters, include key search terms)
+CONDITION: [Near Mint / Lightly Played / Moderately Played / Heavily Played]
 
-CONDITION: (Suggest: New, Like New, Very Good, Good, or Acceptable based on typical condition)
+DESCRIPTION:
+- Card: [Full card name]
+- Set: [Set name and number (e.g., "Base Set 4/102")]
+- Type: [Holo / Reverse Holo / Regular / etc.]
+- Condition: [Brief condition notes - 1 sentence max]
+- Price: Based on market analysis at $${recommendedPrice ? recommendedPrice.toFixed(2) : 'TBD'}
 
-DESCRIPTION: (Write 3-4 paragraphs:
-- Paragraph 1: Engaging opening about the item
-- Paragraph 2: Key features and specifications
-- Paragraph 3: Condition details and what's included
-- Paragraph 4: Shipping and return information)
+No extra text. Just these facts.`;
+    } else {
+      // Standard longer format
+      prompt = `Create a professional eBay listing for: ${itemName}
 
-ITEM SPECIFICS: (List 5-8 key details like Brand, Model, Size, Color, etc.)
+TITLE: (SEO-optimized, max 80 characters)
 
-PRICING NOTES: (Brief note about the ${recommendedPrice ? `$${recommendedPrice}` : 'suggested'} price point based on market analysis)`;
+CONDITION: (New, Like New, Very Good, Good, or Acceptable)
 
-    // If we have image data, include it
+DESCRIPTION: (3-4 paragraphs with key features, condition, shipping info)
+
+ITEM SPECIFICS: (5-8 key details)
+
+PRICING: (Note about the ${recommendedPrice ? `$${recommendedPrice}` : 'suggested'} price)`;
+    }
+
     const messages = [{
       role: 'user',
       content: imageData ? [
@@ -268,7 +284,7 @@ PRICING NOTES: (Brief note about the ${recommendedPrice ? `$${recommendedPrice}`
       'https://api.anthropic.com/v1/messages',
       {
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
+        max_tokens: mode === 'pokemon' ? 500 : 2000,
         messages: messages
       },
       {
@@ -289,6 +305,89 @@ PRICING NOTES: (Brief note about the ${recommendedPrice ? `$${recommendedPrice}`
     console.error('Error generating listing:', error.message);
     res.status(500).json({ 
       error: 'Failed to generate listing',
+      details: error.message 
+    });
+  }
+});
+
+// ============================================================================
+// BATCH ANALYZE IMAGES ENDPOINT
+// ============================================================================
+app.post('/api/batch-analyze', async (req, res) => {
+  try {
+    const { images } = req.body; // Array of {imageData, mimeType}
+
+    if (!images || images.length === 0) {
+      return res.status(400).json({ error: 'Images array is required' });
+    }
+
+    console.log(`Batch analyzing ${images.length} images...`);
+
+    const results = [];
+
+    // Process images sequentially to avoid rate limits
+    for (let i = 0; i < images.length; i++) {
+      const { imageData, mimeType } = images[i];
+      
+      try {
+        const response = await axios.post(
+          'https://api.anthropic.com/v1/messages',
+          {
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 500,
+            messages: [{
+              role: 'user',
+              content: [
+                {
+                  type: 'image',
+                  source: {
+                    type: 'base64',
+                    media_type: mimeType,
+                    data: imageData
+                  }
+                },
+                {
+                  type: 'text',
+                  text: 'Identify this item in 3-8 words for eBay search. For Pokemon cards, include: Card name, set if visible. Return ONLY the search query.'
+                }
+              ]
+            }]
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': EBAY_CONFIG.CLAUDE_API_KEY,
+              'anthropic-version': '2023-06-01'
+            }
+          }
+        );
+
+        const description = response.data.content[0].text.trim();
+        results.push({ 
+          index: i, 
+          description,
+          success: true 
+        });
+        
+        console.log(`Image ${i + 1}/${images.length}: "${description}"`);
+
+      } catch (error) {
+        console.error(`Error analyzing image ${i + 1}:`, error.message);
+        results.push({ 
+          index: i, 
+          description: null,
+          success: false,
+          error: error.message 
+        });
+      }
+    }
+
+    res.json({ results });
+
+  } catch (error) {
+    console.error('Batch analyze error:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to batch analyze',
       details: error.message 
     });
   }
