@@ -46,20 +46,6 @@
             margin-bottom: 30px;
         }
         
-        .file-input-wrapper {
-            position: relative;
-            display: inline-block;
-            cursor: pointer;
-        }
-        
-        input[type="file"] {
-            position: absolute;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-        }
-        
         .upload-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -75,6 +61,10 @@
         
         .upload-btn:hover {
             transform: scale(1.05);
+        }
+        
+        input[type="file"] {
+            display: none;
         }
         
         .batch-info {
@@ -312,10 +302,8 @@
         <p class="subtitle">Upload multiple cards, verify details, get accurate eBay pricing</p>
         
         <div class="upload-section" id="uploadSection">
-            <div class="file-input-wrapper">
-                <div class="upload-btn">📸 Select Card Photos</div>
-                <input type="file" id="fileInput" accept="image/*" multiple>
-            </div>
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">📸 Select Card Photos</button>
+            <input type="file" id="fileInput" accept="image/*" multiple>
             <div class="batch-info">Select multiple photos to process as a batch</div>
         </div>
         
